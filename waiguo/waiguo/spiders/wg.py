@@ -1,0 +1,73 @@
+# -*- coding: utf-8 -*-
+import scrapy
+import os
+
+# from ..items import WaiguoItem
+# item = WaiguoItem()
+
+class WgSpider(scrapy.Spider):
+    name = 'wg'
+    allowed_domains = []
+    start_urls = ['http://www.mmjpg.com/']
+
+    # 指定接着爬取的url
+    page = 1
+    url = 'http://www.mmjpg.com/home/{}'
+
+    def parse(self, response):
+        urllist = response.xpath('//div[@class="pic"]//li/a/@href').extract()
+        for url in urllist:
+            # print(url)  http://www.mmjpg.com/mm/1393
+            yield scrapy.Request(url=url, callback=self.download)
+
+        # 接着发送请求，爬取其它页  在 for 循环的外面  ，和for同级
+        if self.page < 103:
+            self.page += 1
+            url = self.url.format(self.page)
+            # 生成请求对象，扔给引擎
+            # callback 就是处理响应的回调函数
+            yield scrapy.Request(url=url, callback=self.parse)
+
+
+    def download(self,response):
+        # 最大页码
+        number = response.xpath('//div[ @ id = "page"]//*[last()-2]/text()').extract()
+        nu = int(number[0])
+        for num in range(1,nu + 1):
+            xqurl = response.url + '/{}'.format(num)
+            # print(xqurl)  http://www.mmjpg.com/mm/1534/1
+            print('正在下载第{}页'.format(xqurl))
+            yield scrapy.Request(url=xqurl, callback=self.download_b)
+
+        # # 接着发送请求，爬取其它页  在 for 循环的外面  ，和for同级
+        # if self.content < int(number+1):
+        #     pass
+        # else:
+        #     os.mkdir(content)
+        #     url = self.url.format(self.page)
+        #     # 生成请求对象，扔给引擎
+        #     # callback 就是处理响应的回调函数
+        #     yield scrapy.Request(url=url, callback=self.parse)
+
+
+
+     # 详情页面
+    def download_b(self,response):
+        # 保存图片  保存名字  并且分类文件夹
+        div = response.xpath('//div[@id="content"]/a/img')
+        img = div.xpath('@data-img').extract_first()
+        title = div.xpath('@alt').extract_first()
+        yield scrapy.Request(url=img,meta={'title':title} ,callback=self.download_c)
+
+    def download_c(self,response):
+        dirpath = r'C:\Users\dengc\Desktop\MZT_home'
+        if not os.path.exists(dirpath):
+            os.mkdir(dirpath)
+        img_path = os.path.join(dirpath,response.meta['title']) + '.jpg'
+
+        # 保存
+        with open(img_path, 'wb')as fp:
+            fp.write(response.body)
+        print('{}--保存完成'.format(response.meta['title']))
+
+
